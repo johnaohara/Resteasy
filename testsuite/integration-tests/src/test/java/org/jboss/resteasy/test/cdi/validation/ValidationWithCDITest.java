@@ -2,6 +2,7 @@ package org.jboss.resteasy.test.cdi.validation;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.client.Invocation.Builder;
 import javax.ws.rs.core.MediaType;
@@ -19,6 +20,8 @@ import org.jboss.resteasy.test.cdi.validation.resource.AsyncRootResourceImpl;
 import org.jboss.resteasy.test.cdi.validation.resource.AsyncSubResource;
 import org.jboss.resteasy.test.cdi.validation.resource.AsyncSubResourceImpl;
 import org.jboss.resteasy.test.cdi.validation.resource.AsyncValidResource;
+import org.jboss.resteasy.test.cdi.validation.resource.EjbManagedMethodParamImpl;
+import org.jboss.resteasy.test.cdi.validation.resource.EjbParam;
 import org.jboss.resteasy.test.cdi.validation.resource.QueryBeanParam;
 import org.jboss.resteasy.test.cdi.validation.resource.QueryBeanParamImpl;
 import org.jboss.resteasy.test.cdi.validation.resource.RootResource;
@@ -60,6 +63,7 @@ public class ValidationWithCDITest
          .addClasses(AsyncRootResource.class, AsyncRootResourceImpl.class)
          .addClasses(AsyncSubResource.class, AsyncSubResourceImpl.class)
          .addClasses(AsyncValidResource.class)
+         .addClasses( EjbManagedMethodParamImpl.class, EjbParam.class )
               .addAsWebInfResource(EmptyAsset.INSTANCE, "beans.xml")
          .addAsWebInfResource(ValidationWithCDITest.class.getPackage(), "web.xml", "/web.xml");
       System.out.println(war.toString(true));
@@ -135,7 +139,35 @@ public class ValidationWithCDITest
          response.close();
       }
    }
-   
+
+   /**
+    * @tpTestDetails Tests Bean Validation constraints on method parameters for multiple calls
+    * @tpSince RESTEasy
+    */   @Test
+   public void testEjbManagedValidation(){
+      Client client = ClientBuilder.newClient();
+      WebTarget base = client.target(generateURL("/test/ejbManaged"));
+
+      {
+         Builder builder = base.request();
+         builder.accept(MediaType.APPLICATION_JSON);
+         EjbParam ejbParam = new EjbParam("test1");
+         Response response = builder.post( Entity.entity( ejbParam, MediaType.APPLICATION_JSON ) );
+         Assert.assertEquals(204, response.getStatus());
+         response.close();
+      }
+
+      //Repeat to check subsequent validations are correct
+      {
+         Builder builder = base.request();
+         builder.accept( MediaType.APPLICATION_JSON );
+         EjbParam ejbParam = new EjbParam( "2" );
+         Response response = builder.post( Entity.entity( ejbParam, MediaType.APPLICATION_JSON ) );
+         Assert.assertEquals( 400, response.getStatus() );
+         response.close();
+
+      }
+   }
    private void countViolations(ViolationReport e, int fieldCount, int propertyCount, int classCount, int parameterCount, int returnValueCount)
    {
       Assert.assertEquals(fieldCount, e.getFieldViolations().size());
